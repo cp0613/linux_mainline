@@ -27,6 +27,7 @@
 #define __HAVE_ARCH___FLS
 #define __HAVE_ARCH_FFS
 #define __HAVE_ARCH_FLS
+#define __HAVE_ARCH_ROTATE
 
 #include <asm-generic/bitops/__ffs.h>
 #include <asm-generic/bitops/__fls.h>
@@ -176,6 +177,244 @@ legacy:
 	 :							\
 	 variable_fls(x_);					\
 })
+
+static __always_inline u64 variable_rol64(u64 word, unsigned int shift)
+{
+	asm goto(ALTERNATIVE("j %l[legacy]", "nop", 0,
+				      RISCV_ISA_EXT_ZBB, 1)
+			  : : : : legacy);
+
+	asm volatile(
+		".option push\n"
+		".option arch,+zbb\n"
+		"rol %0, %1, %2\n"
+		".option pop\n"
+		: "=r" (word) : "r" (word), "r" (shift) :);
+
+	return word;
+
+legacy:
+	return generic_rol64(word, shift);
+}
+
+static __always_inline u64 variable_ror64(u64 word, unsigned int shift)
+{
+	asm goto(ALTERNATIVE("j %l[legacy]", "nop", 0,
+				      RISCV_ISA_EXT_ZBB, 1)
+			  : : : : legacy);
+
+	asm volatile(
+		".option push\n"
+		".option arch,+zbb\n"
+		"ror %0, %1, %2\n"
+		".option pop\n"
+		: "=r" (word) : "r" (word), "r" (shift) :);
+
+	return word;
+
+legacy:
+	return generic_ror64(word, shift);
+}
+
+static inline u32 variable_rol32(u32 word, unsigned int shift)
+{
+	asm goto(ALTERNATIVE("j %l[legacy]", "nop", 0,
+				      RISCV_ISA_EXT_ZBB, 1)
+			  : : : : legacy);
+
+	asm volatile(
+		".option push\n"
+		".option arch,+zbb\n"
+		"rolw %0, %1, %2\n"
+		".option pop\n"
+		: "=r" (word) : "r" (word), "r" (shift) :);
+
+	return word;
+
+legacy:
+	return generic_rol32(word, shift);
+}
+
+static __always_inline u32 variable_ror32(u32 word, unsigned int shift)
+{
+	asm goto(ALTERNATIVE("j %l[legacy]", "nop", 0,
+				      RISCV_ISA_EXT_ZBB, 1)
+			  : : : : legacy);
+
+	asm volatile(
+		".option push\n"
+		".option arch,+zbb\n"
+		"rorw %0, %1, %2\n"
+		".option pop\n"
+		: "=r" (word) : "r" (word), "r" (shift) :);
+
+	return word;
+
+legacy:
+	return generic_ror32(word, shift);
+}
+
+static __always_inline u16 variable_rol16(u16 word, unsigned int shift)
+{
+	u32 word32 = ((u32)word << 16) | word;
+
+	asm goto(ALTERNATIVE("j %l[legacy]", "nop", 0,
+				      RISCV_ISA_EXT_ZBB, 1)
+			  : : : : legacy);
+
+	asm volatile(
+		".option push\n"
+		".option arch,+zbb\n"
+		"rolw %0, %1, %2\n"
+		".option pop\n"
+		: "=r" (word32) : "r" (word32), "r" (shift) :);
+
+	return (u16)word32;
+
+legacy:
+	return generic_rol16(word, shift);
+}
+
+static __always_inline u16 variable_ror16(u16 word, unsigned int shift)
+{
+	u32 word32 = ((u32)word << 16) | word;
+
+	asm goto(ALTERNATIVE("j %l[legacy]", "nop", 0,
+				      RISCV_ISA_EXT_ZBB, 1)
+			  : : : : legacy);
+
+	asm volatile(
+		".option push\n"
+		".option arch,+zbb\n"
+		"rorw %0, %1, %2\n"
+		".option pop\n"
+		: "=r" (word32) : "r" (word32), "r" (shift) :);
+
+	return (u16)word32;
+
+legacy:
+	return generic_ror16(word, shift);
+}
+
+static __always_inline u8 variable_rol8(u8 word, unsigned int shift)
+{
+	u32 word32;
+
+	asm goto(ALTERNATIVE("j %l[legacy]", "nop", 0,
+				      RISCV_ISA_EXT_ZBB, 1)
+			  : : : : legacy);
+
+	word32 = ((u32)word << 24) | word;
+	shift %= 8;
+
+	asm volatile(
+		".option push\n"
+		".option arch,+zbb\n"
+		"rolw %0, %1, %2\n"
+		".option pop\n"
+		: "=r" (word32) : "r" (word32), "r" (shift) :);
+
+	return (u8)word32;
+
+legacy:
+	return generic_rol8(word, shift);
+}
+
+static __always_inline u8 variable_ror8(u8 word, unsigned int shift)
+{
+	u32 word32;
+
+	asm goto(ALTERNATIVE("j %l[legacy]", "nop", 0,
+				      RISCV_ISA_EXT_ZBB, 1)
+			  : : : : legacy);
+
+	word32 = ((u32)word << 8) | word;
+	shift %= 8;
+
+	asm volatile(
+		".option push\n"
+		".option arch,+zbb\n"
+		"rorw %0, %1, %2\n"
+		".option pop\n"
+		: "=r" (word32) : "r" (word32), "r" (shift) :);
+
+	return (u8)word32;
+
+legacy:
+	return generic_ror8(word, shift);
+}
+
+/**
+ * rol64 - rotate a 64-bit value left
+ * @word: value to rotate
+ * @shift: bits to roll
+ */
+#define rol64(word, shift) \
+	(__builtin_constant_p(word)&&__builtin_constant_p(shift) ? \
+	generic_rol64(word, shift) : variable_rol64(word, shift))
+
+/**
+ * ror64 - rotate a 64-bit value right
+ * @word: value to rotate
+ * @shift: bits to roll
+ */
+#define ror64(word, shift) \
+	(__builtin_constant_p(word)&&__builtin_constant_p(shift) ? \
+	generic_ror64(word, shift) : variable_ror64(word, shift))
+
+/**
+ * rol32 - rotate a 32-bit value left
+ * @word: value to rotate
+ * @shift: bits to roll
+ */
+#define rol32(word, shift) \
+	(__builtin_constant_p(word)&&__builtin_constant_p(shift) ? \
+	generic_rol32(word, shift) : variable_rol32(word, shift))
+
+/**
+ * ror32 - rotate a 32-bit value right
+ * @word: value to rotate
+ * @shift: bits to roll
+ */
+#define ror32(word, shift) \
+	(__builtin_constant_p(word)&&__builtin_constant_p(shift) ? \
+	generic_ror32(word, shift) : variable_ror32(word, shift))
+
+/**
+ * rol16 - rotate a 16-bit value left
+ * @word: value to rotate
+ * @shift: bits to roll
+ */
+#define rol16(word, shift) \
+	(__builtin_constant_p(word)&&__builtin_constant_p(shift) ? \
+	generic_rol16(word, shift) : variable_rol16(word, shift))
+
+/**
+ * ror16 - rotate a 16-bit value right
+ * @word: value to rotate
+ * @shift: bits to roll
+ */
+#define ror16(word, shift) \
+	(__builtin_constant_p(word)&&__builtin_constant_p(shift) ? \
+	generic_ror16(word, shift) : variable_ror16(word, shift))
+
+/**
+ * rol8 - rotate an 8-bit value left
+ * @word: value to rotate
+ * @shift: bits to roll
+ */
+#define rol8(word, shift) \
+	(__builtin_constant_p(word)&&__builtin_constant_p(shift) ? \
+	generic_rol8(word, shift) : variable_rol8(word, shift))
+
+/**
+ * ror8 - rotate an 8-bit value right
+ * @word: value to rotate
+ * @shift: bits to roll
+ */
+#define ror8(word, shift) \
+	(__builtin_constant_p(word)&&__builtin_constant_p(shift) ? \
+	generic_ror8(word, shift) : variable_ror8(word, shift))
 
 #endif /* !(defined(CONFIG_RISCV_ISA_ZBB) && defined(CONFIG_TOOLCHAIN_HAS_ZBB)) || defined(NO_ALTERNATIVE) */
 
