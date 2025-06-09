@@ -478,6 +478,8 @@ static inline int ffs(int word)
 #include <asm-generic/bitops/le.h>
 #include <asm-generic/bitops/ext2-atomic.h>
 
+#include <asm-generic/bitops/rotate.h>
+
 #endif /* __KERNEL__ */
 
 #endif /* _ASM_BITOPS_H */

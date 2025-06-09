@@ -246,5 +246,6 @@ static inline int fls(unsigned int word)
 #include <asm-generic/bitops/sched.h>
 #include <asm-generic/bitops/le.h>
 #include <asm-generic/bitops/ext2-atomic-setbit.h>
+#include <asm-generic/bitops/rotate.h>
 
 #endif /* _S390_BITOPS_H */

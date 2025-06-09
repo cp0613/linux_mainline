@@ -473,6 +473,8 @@ sched_find_first_bit(const unsigned long b[2])
 
 #include <asm-generic/bitops/ext2-atomic-setbit.h>
 
+#include <asm-generic/bitops/rotate.h>
+
 #endif /* __KERNEL__ */
 
 #endif /* _ALPHA_BITOPS_H */

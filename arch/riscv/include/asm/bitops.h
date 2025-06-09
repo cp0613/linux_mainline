@@ -20,6 +20,7 @@
 #include <asm-generic/bitops/__fls.h>
 #include <asm-generic/bitops/ffs.h>
 #include <asm-generic/bitops/fls.h>
+#include <asm-generic/bitops/rotate.h>
 
 #else
 #define __HAVE_ARCH___FFS
@@ -31,6 +32,7 @@
 #include <asm-generic/bitops/__fls.h>
 #include <asm-generic/bitops/ffs.h>
 #include <asm-generic/bitops/fls.h>
+#include <asm-generic/bitops/rotate.h>
 
 #include <asm/alternative-macros.h>
 #include <asm/hwcap.h>

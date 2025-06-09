@@ -215,4 +215,6 @@ BIT_OPS(change, "xor", )
 #include <asm-generic/bitops/lock.h>
 #include <asm-generic/bitops/sched.h>
 
+#include <asm-generic/bitops/rotate.h>
+
 #endif	/* _XTENSA_BITOPS_H */

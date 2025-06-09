@@ -434,5 +434,7 @@ static __always_inline int fls64(__u64 x)
 
 #include <asm-generic/bitops/ext2-atomic-setbit.h>
 
+#include <asm-generic/bitops/rotate.h>
+
 #endif /* __KERNEL__ */
 #endif /* _ASM_X86_BITOPS_H */

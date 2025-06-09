@@ -564,6 +564,7 @@ static inline unsigned long __fls(unsigned long x)
 #include <asm-generic/bitops/sched.h>
 #include <asm-generic/bitops/hweight.h>
 #include <asm-generic/bitops/le.h>
+#include <asm-generic/bitops/rotate.h>
 #endif /* __KERNEL__ */
 
 #endif /* _M68K_BITOPS_H */

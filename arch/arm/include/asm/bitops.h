@@ -273,6 +273,8 @@ static inline int find_next_bit_le(const void *p, int size, int offset)
  */
 #include <asm-generic/bitops/ext2-atomic-setbit.h>
 
+#include <asm-generic/bitops/rotate.h>
+
 #endif /* __KERNEL__ */
 
 #endif /* _ARM_BITOPS_H */

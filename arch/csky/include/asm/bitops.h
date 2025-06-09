@@ -76,4 +76,7 @@ static __always_inline unsigned long __fls(unsigned long x)
 
 #include <asm-generic/bitops/le.h>
 #include <asm-generic/bitops/ext2-atomic.h>
+
+#include <asm-generic/bitops/rotate.h>
+
 #endif /* __ASM_CSKY_BITOPS_H */

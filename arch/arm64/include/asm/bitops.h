@@ -28,4 +28,6 @@
 #include <asm-generic/bitops/le.h>
 #include <asm-generic/bitops/ext2-atomic-setbit.h>
 
+#include <asm-generic/bitops/rotate.h>
+
 #endif /* __ASM_BITOPS_H */
