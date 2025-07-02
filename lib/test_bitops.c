@@ -76,6 +76,76 @@ static int __init test_fns(void)
 	return 0;
 }
 
+static int __init test_rorl(void)
+{
+	static volatile __always_used u64 tmp __initdata;
+	void *buf __free(kfree) = NULL;
+	u32 i, n, loop = 1000;
+	ktime_t time;
+
+	buf = kmalloc_array(loop, sizeof(u64), GFP_KERNEL);
+	if (!buf)
+		return -ENOMEM;
+
+	time = ktime_get();
+	for (n = 0; n < BITS_PER_LONG; n++)
+		for (i = 0; i < loop; i++)
+			tmp = rol64(((u64 *)buf)[i], n);
+	time = ktime_get() - time;
+	pr_err("rol64:  %18llu ns\n", time);
+
+	time = ktime_get();
+	for (n = 0; n < BITS_PER_LONG; n++)
+		for (i = 0; i < loop; i++)
+			tmp = ror64(((u64 *)buf)[i], n);
+	time = ktime_get() - time;
+	pr_err("ror64:  %18llu ns\n", time);
+
+	time = ktime_get();
+	for (n = 0; n < BITS_PER_LONG; n++)
+		for (i = 0; i < loop * 2; i++)
+			tmp = ror32(((u32 *)buf)[i], n);
+	time = ktime_get() - time;
+	pr_err("ror32:  %18llu ns\n", time);
+
+	time = ktime_get();
+	for (n = 0; n < BITS_PER_LONG; n++)
+		for (i = 0; i < loop * 2; i++)
+			tmp = rol32(((u32 *)buf)[i], n);
+	time = ktime_get() - time;
+	pr_err("rol32:  %18llu ns\n", time);
+
+	time = ktime_get();
+	for (n = 0; n < BITS_PER_LONG; n++)
+		for (i = 0; i < loop * 4; i++)
+			tmp = ror16(((u16 *)buf)[i], n);
+	time = ktime_get() - time;
+	pr_err("ror16:  %18llu ns\n", time);
+
+	time = ktime_get();
+	for (n = 0; n < BITS_PER_LONG; n++)
+		for (i = 0; i < loop * 4; i++)
+			tmp = rol16(((u16 *)buf)[i], n);
+	time = ktime_get() - time;
+	pr_err("rol16:  %18llu ns\n", time);
+
+	time = ktime_get();
+	for (n = 0; n < BITS_PER_LONG; n++)
+		for (i = 0; i < loop * 8; i++)
+			tmp = ror8(((u8 *)buf)[i], n);
+	time = ktime_get() - time;
+	pr_err("ror8:  %18llu ns\n", time);
+
+	time = ktime_get();
+	for (n = 0; n < BITS_PER_LONG; n++)
+		for (i = 0; i < loop * 8; i++)
+			tmp = rol8(((u8 *)buf)[i], n);
+	time = ktime_get() - time;
+	pr_err("rol8:  %18llu ns\n", time);
+
+	return 0;
+}
+
 static void __init test_bitops_const_eval(void)
 {
 	/*
@@ -171,6 +241,7 @@ static int __init test_bitops_startup(void)
 		pr_err("ERROR: FOUND SET BIT %d\n", bit_set);
 
 	test_fns();
+	test_rorl();
 	test_bitops_const_eval();
 
 	pr_info("Completed bitops test\n");
