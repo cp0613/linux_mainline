@@ -115,6 +115,16 @@ config STARFIVE_STARLINK_PMU
 	   an L3 memory system. The L3 cache events are added into perf event
 	   subsystem, allowing monitoring of various L3 cache perf events.
 
+config XUANTIE_LINK_PMU
+	bool "Enable support for Xuantie Link"
+	depends on 64BIT
+	depends on PERF_EVENTS
+	help
+	  Provide support for Xuantie Link Hardware Profiling Co-Processor (HPCP).
+	  Xuantie Link HPCP integrates one or more cores with an L3 memory system.
+	  The L3 cache events are added into perf event subsystem, allowing
+	  monitoring of various L3 cache performance events.
+
 config ANDES_CUSTOM_PMU
 	bool "Andes custom PMU support"
 	depends on ARCH_RENESAS && RISCV_ALTERNATIVE && RISCV_PMU_SBI
