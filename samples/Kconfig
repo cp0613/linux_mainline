@@ -321,6 +321,11 @@ config SAMPLE_HUNG_TASK
 	  if 2 or more processes read the same file concurrently, it will
 	  be detected by the hung_task watchdog.
 
+config SAMPLE_IRQ_TRIGGER
+	tristate "trigger a user defined irq"
+	help
+	  trigger a user defined irq.
+
 source "samples/rust/Kconfig"
 
 source "samples/damon/Kconfig"
