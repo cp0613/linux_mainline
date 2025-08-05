@@ -254,18 +254,15 @@ enum {
 	} while (0)
 
 struct arch_hw_breakpoint {
-	unsigned long address;
+	unsigned long addr;
+	unsigned long type;
 	unsigned long len;
-	unsigned int type;
 
 	/* Trigger configuration data */
 	unsigned long tdata1;
 	unsigned long tdata2;
 	unsigned long tdata3;
 };
-
-/* Maximum number of hardware breakpoints supported */
-#define HW_BP_NUM_MAX 32
 
 struct perf_event_attr;
 struct notifier_block;

@@ -208,7 +208,7 @@ int arch_check_bp_in_kernelspace(struct arch_hw_breakpoint *hw)
 	unsigned int len;
 	unsigned long va;
 
-	va = hw->address;
+	va = hw->addr;
 	len = hw->len;
 
 	return (va >= TASK_SIZE) && ((va + len - 1) >= TASK_SIZE);
@@ -350,7 +350,7 @@ int hw_breakpoint_arch_parse(struct perf_event *bp,
 	int ret;
 
 	/* Breakpoint address */
-	hw->address = attr->bp_addr;
+	hw->addr = attr->bp_addr;
 	hw->tdata2 = attr->bp_addr;
 	hw->tdata3 = 0x0;
 
@@ -389,7 +389,7 @@ static int hw_breakpoint_handler(struct die_args *args)
 		switch (bp->type) {
 		/* Breakpoint */
 		case RV_DBTR_BP:
-			if (bp->address == args->regs->epc) {
+			if (bp->addr == args->regs->epc) {
 				perf_bp_event(event, args->regs);
 				ret = NOTIFY_STOP;
 			}
@@ -397,14 +397,14 @@ static int hw_breakpoint_handler(struct die_args *args)
 
 		/* Watchpoint */
 		case RV_DBTR_WP:
-			if (bp->address == csr_read(CSR_STVAL)) {
+			if (bp->addr == csr_read(CSR_STVAL)) {
 				perf_bp_event(event, args->regs);
 				ret = NOTIFY_STOP;
 			}
 			break;
 
 		default:
-			pr_warn("%s: Unknown type: %u\n", __func__, bp->type);
+			pr_warn("%s: Unknown type: %ld\n", __func__, bp->type);
 			break;
 		}
 	}
@@ -608,7 +608,13 @@ void clear_ptrace_hw_breakpoint(struct task_struct *tsk)
 
 void flush_ptrace_hw_breakpoint(struct task_struct *tsk)
 {
-	/* TODO */
+	int i;
+	struct thread_struct *t = &tsk->thread;
+
+	for (i = 0; i < HW_BP_NUM_MAX; i++) {
+		unregister_hw_breakpoint(t->ptrace_bps[i]);
+		t->ptrace_bps[i] = NULL;
+	}
 }
 
 static int __init arch_hw_breakpoint_init(void)

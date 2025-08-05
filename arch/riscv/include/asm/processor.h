@@ -16,6 +16,7 @@
 #include <asm/insn-def.h>
 #include <asm/alternative-macros.h>
 #include <asm/hwcap.h>
+#include <asm/hw_breakpoint.h>
 
 #define arch_get_mmap_end(addr, len, flags)			\
 ({								\
@@ -57,6 +58,7 @@
 #ifndef __ASSEMBLY__
 
 struct task_struct;
+struct perf_event;
 struct pt_regs;
 
 /*
@@ -121,6 +123,11 @@ struct thread_struct {
 	bool force_icache_flush;
 	/* A forced icache flush is not needed if migrating to the previous cpu. */
 	unsigned int prev_cpu;
+#endif
+#ifdef CONFIG_HAVE_HW_BREAKPOINT
+	struct perf_event *ptrace_bps[HW_BP_NUM_MAX];
+	struct arch_hw_breakpoint hbp_break[HW_BP_NUM_MAX];
+	struct arch_hw_breakpoint hbp_watch[HW_BP_NUM_MAX];
 #endif
 };
 

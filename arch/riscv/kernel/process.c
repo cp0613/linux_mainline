@@ -18,6 +18,7 @@
 #include <linux/uaccess.h>
 #include <linux/personality.h>
 #include <linux/entry-common.h>
+#include <linux/hw_breakpoint.h>
 
 #include <asm/asm-prototypes.h>
 #include <asm/unistd.h>
@@ -188,6 +189,9 @@ void flush_thread(void)
 	if (riscv_has_extension_unlikely(RISCV_ISA_EXT_SUPM))
 		envcfg_update_bits(current, ENVCFG_PMM, ENVCFG_PMM_PMLEN_0);
 #endif
+#ifdef CONFIG_HAVE_HW_BREAKPOINT
+	flush_ptrace_hw_breakpoint(current);
+#endif
 }
 
 void arch_release_task_struct(struct task_struct *tsk)
@@ -231,6 +235,10 @@ int copy_thread(struct task_struct *p, const struct kernel_clone_args *args)
 	/* Ensure all threads in this mm have the same pointer masking mode. */
 	if (IS_ENABLED(CONFIG_RISCV_ISA_SUPM) && p->mm && (clone_flags & CLONE_VM))
 		set_bit(MM_CONTEXT_LOCK_PMLEN, &p->mm->context.flags);
+
+#ifdef CONFIG_HAVE_HW_BREAKPOINT
+	clear_ptrace_hw_breakpoint(p);
+#endif
 
 	memset(&p->thread.s, 0, sizeof(p->thread.s));
 
