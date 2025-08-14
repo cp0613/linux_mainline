@@ -239,29 +239,30 @@ static int rv_init_mcontrol_trigger(const struct perf_event_attr *attr,
 		return -EINVAL;
 	}
 
-	switch (attr->bp_len) {
-	case HW_BREAKPOINT_LEN_1:
-		hw->len = 1;
-		RV_DBTR_SET_MC_SIZELO(hw->tdata1, 1);
-		break;
-	case HW_BREAKPOINT_LEN_2:
-		hw->len = 2;
-		RV_DBTR_SET_MC_SIZELO(hw->tdata1, 2);
-		break;
-	case HW_BREAKPOINT_LEN_4:
-		hw->len = 4;
-		RV_DBTR_SET_MC_SIZELO(hw->tdata1, 3);
-		break;
-#if __riscv_xlen >= 64
-	case HW_BREAKPOINT_LEN_8:
-		hw->len = 8;
-		RV_DBTR_SET_MC_SIZELO(hw->tdata1, 1);
-		RV_DBTR_SET_MC_SIZEHI(hw->tdata1, 1);
-		break;
-#endif
-	default:
-		return -EINVAL;
-	}
+	RV_DBTR_SET_MC_SIZELO(hw->tdata1, 0);
+// 	switch (attr->bp_len) {
+// 	case HW_BREAKPOINT_LEN_1:
+// 		hw->len = 1;
+// 		RV_DBTR_SET_MC_SIZELO(hw->tdata1, 1);
+// 		break;
+// 	case HW_BREAKPOINT_LEN_2:
+// 		hw->len = 2;
+// 		RV_DBTR_SET_MC_SIZELO(hw->tdata1, 2);
+// 		break;
+// 	case HW_BREAKPOINT_LEN_4:
+// 		hw->len = 4;
+// 		RV_DBTR_SET_MC_SIZELO(hw->tdata1, 3);
+// 		break;
+// #if __riscv_xlen >= 64
+// 	case HW_BREAKPOINT_LEN_8:
+// 		hw->len = 8;
+// 		RV_DBTR_SET_MC_SIZELO(hw->tdata1, 1);
+// 		RV_DBTR_SET_MC_SIZEHI(hw->tdata1, 1);
+// 		break;
+// #endif
+// 	default:
+// 		return -EINVAL;
+// 	}
 
 	RV_DBTR_SET_MC_TYPE(hw->tdata1, RV_DBTR_TRIG_MCONTROL);
 
@@ -304,26 +305,27 @@ static int rv_init_mcontrol6_trigger(const struct perf_event_attr *attr,
 		return -EINVAL;
 	}
 
-	switch (attr->bp_len) {
-	case HW_BREAKPOINT_LEN_1:
-		hw->len = 1;
-		RV_DBTR_SET_MC6_SIZE(hw->tdata1, 1);
-		break;
-	case HW_BREAKPOINT_LEN_2:
-		hw->len = 2;
-		RV_DBTR_SET_MC6_SIZE(hw->tdata1, 2);
-		break;
-	case HW_BREAKPOINT_LEN_4:
-		hw->len = 4;
-		RV_DBTR_SET_MC6_SIZE(hw->tdata1, 3);
-		break;
-	case HW_BREAKPOINT_LEN_8:
-		hw->len = 8;
-		RV_DBTR_SET_MC6_SIZE(hw->tdata1, 5);
-		break;
-	default:
-		return -EINVAL;
-	}
+	RV_DBTR_SET_MC6_SIZE(hw->tdata1, 0);
+	// switch (attr->bp_len) {
+	// case HW_BREAKPOINT_LEN_1:
+	// 	hw->len = 1;
+	// 	RV_DBTR_SET_MC6_SIZE(hw->tdata1, 1);
+	// 	break;
+	// case HW_BREAKPOINT_LEN_2:
+	// 	hw->len = 2;
+	// 	RV_DBTR_SET_MC6_SIZE(hw->tdata1, 2);
+	// 	break;
+	// case HW_BREAKPOINT_LEN_4:
+	// 	hw->len = 4;
+	// 	RV_DBTR_SET_MC6_SIZE(hw->tdata1, 3);
+	// 	break;
+	// case HW_BREAKPOINT_LEN_8:
+	// 	hw->len = 8;
+	// 	RV_DBTR_SET_MC6_SIZE(hw->tdata1, 5);
+	// 	break;
+	// default:
+	// 	return -EINVAL;
+	// }
 
 	RV_DBTR_SET_MC6_TYPE(hw->tdata1, RV_DBTR_TRIG_MCONTROL6);
 
