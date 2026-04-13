@@ -10,6 +10,7 @@
 #include <asm/asm.h>
 #include <asm/asm-offsets.h>
 #include <asm/csr.h>
+#include <asm/unwind_hints.h>
 
 .macro SAVE_HOST_GPRS
 	/* Save Host GPRs (except A0 and T0-T6) */
@@ -188,7 +189,6 @@
 .endm
 
 	.text
-	.altmacro
 	.option norelax
 
 	/*
@@ -217,6 +217,7 @@ SYM_FUNC_START(__kvm_riscv_switch_to)
 	/* Return to C code */
 	ret
 SYM_FUNC_END(__kvm_riscv_switch_to)
+STACK_FRAME_NON_STANDARD(__kvm_riscv_switch_to)
 
 	/*
 	 * Parameters:
@@ -246,8 +247,10 @@ SYM_FUNC_START(__kvm_riscv_nacl_switch_to)
 	/* Return to C code */
 	ret
 SYM_FUNC_END(__kvm_riscv_nacl_switch_to)
+STACK_FRAME_NON_STANDARD(__kvm_riscv_nacl_switch_to)
 
 SYM_CODE_START(__kvm_riscv_unpriv_trap)
+	UNWIND_HINT_END_OF_STACK
 	/*
 	 * We assume that faulting unpriv load/store instruction is
 	 * 4-byte long and blindly increment SEPC by 4.

@@ -16,6 +16,7 @@
 #include <asm/thread_info.h>
 #include <asm/asm-offsets.h>
 #include <asm/errata_list.h>
+#include <asm/unwind_hints.h>
 #include <linux/sizes.h>
 
 	.section .irqentry.text, "ax"
@@ -123,6 +124,7 @@
 .endm
 
 SYM_CODE_START(handle_exception)
+	UNWIND_HINT_END_OF_STACK
 	/*
 	 * If coming from userspace, preserve the user thread pointer and load
 	 * the kernel thread pointer.  If we came from the kernel, the scratch
@@ -245,6 +247,7 @@ ASM_NOKPROBE(handle_exception)
  *  - ret_from_fork
  */
 SYM_CODE_START_NOALIGN(ret_from_exception)
+	UNWIND_HINT_END_OF_STACK
 	REG_L s0, PT_STATUS(sp)
 #ifdef CONFIG_RISCV_M_MODE
 	/* the MPP value is too large to be used as an immediate arg for addi */
@@ -320,6 +323,7 @@ ASM_NOKPROBE(ret_from_exception)
 
 #ifdef CONFIG_VMAP_STACK
 SYM_CODE_START_LOCAL(handle_kernel_stack_overflow)
+	UNWIND_HINT_END_OF_STACK
 	/* we reach here from kernel context, sscratch must be 0 */
 	csrrw x31, CSR_SCRATCH, x31
 	asm_per_cpu sp, overflow_stack, x31
@@ -356,6 +360,7 @@ ASM_NOKPROBE(handle_kernel_stack_overflow)
 #endif
 
 SYM_CODE_START(ret_from_fork_kernel_asm)
+	UNWIND_HINT_END_OF_STACK
 	call schedule_tail
 	move a0, s1 /* fn_arg */
 	move a1, s0 /* fn */
@@ -365,6 +370,7 @@ SYM_CODE_START(ret_from_fork_kernel_asm)
 SYM_CODE_END(ret_from_fork_kernel_asm)
 
 SYM_CODE_START(ret_from_fork_user_asm)
+	UNWIND_HINT_END_OF_STACK
 	call schedule_tail
 	move a0, sp /* pt_regs */
 	call ret_from_fork_user
@@ -406,6 +412,7 @@ SYM_FUNC_START(call_on_irq_stack)
 
 	ret
 SYM_FUNC_END(call_on_irq_stack)
+STACK_FRAME_NON_STANDARD(call_on_irq_stack)
 #endif /* CONFIG_IRQ_STACKS */
 
 /*

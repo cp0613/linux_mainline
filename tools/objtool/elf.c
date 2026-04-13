@@ -336,6 +336,15 @@ struct reloc *find_reloc_by_dest_range(const struct elf *elf, struct section *se
 			    reloc_offset(reloc) < offset + len) {
 				if (!r || reloc_offset(reloc) < reloc_offset(r))
 					r = reloc;
+				/*
+				 * Prefer a reloc with a named symbol over one
+				 * that references the null symbol (idx 0), which
+				 * is used by auxiliary relocs such as
+				 * R_RISCV_RELAX that carry no useful target info.
+				 */
+				else if (reloc_offset(reloc) == reloc_offset(r) &&
+					 reloc->sym->idx != 0 && r->sym->idx == 0)
+					r = reloc;
 			}
 		}
 		if (r)

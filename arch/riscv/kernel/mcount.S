@@ -11,6 +11,7 @@
 #include <asm/thread_info.h>
 #include <asm/asm-offsets.h>
 #include <asm/ftrace.h>
+#include <asm/unwind_hints.h>
 
 	.text
 
@@ -77,6 +78,7 @@ SYM_FUNC_START(return_to_handler)
 	RESTORE_RET_ABI_STATE
 	jalr	a2
 SYM_FUNC_END(return_to_handler)
+STACK_FRAME_NON_STANDARD(return_to_handler)
 #endif
 
 #ifndef CONFIG_DYNAMIC_FTRACE

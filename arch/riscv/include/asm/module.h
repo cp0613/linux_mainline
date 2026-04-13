@@ -5,6 +5,7 @@
 #define _ASM_RISCV_MODULE_H
 
 #include <asm-generic/module.h>
+#include <asm/orc_types.h>
 #include <linux/elf.h>
 
 struct module;
@@ -22,6 +23,12 @@ struct mod_arch_specific {
 	struct mod_section got;
 	struct mod_section plt;
 	struct mod_section got_plt;
+
+#ifdef CONFIG_UNWINDER_ORC
+	unsigned int num_orcs;
+	int *orc_unwind_ip;
+	struct orc_entry *orc_unwind;
+#endif
 };
 
 struct got_entry {

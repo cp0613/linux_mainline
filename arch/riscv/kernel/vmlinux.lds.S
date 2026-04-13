@@ -19,6 +19,9 @@
 #include <asm/cache.h>
 #include <asm/thread_info.h>
 #include <asm/set_memory.h>
+#ifdef CONFIG_UNWINDER_ORC
+#include <asm/orc_lookup.h>
+#endif
 #include "image-vars.h"
 
 #include <linux/sizes.h>
@@ -26,6 +29,11 @@ OUTPUT_ARCH(riscv)
 ENTRY(_start)
 
 jiffies = jiffies_64;
+
+PHDRS {
+	text PT_LOAD FLAGS(5);		/* R_E */
+	data PT_LOAD FLAGS(6);		/* RW_ */
+}
 
 SECTIONS
 {
@@ -46,7 +54,18 @@ SECTIONS
 		IRQENTRY_TEXT
 		SOFTIRQENTRY_TEXT
 		_etext = .;
-	}
+	} :text
+
+	.orc_header : AT(ADDR(.orc_header) - LOAD_OFFSET) {
+		BOUNDED_SECTION_BY(.orc_header, _orc_header)
+	} . = ALIGN(4);
+	.orc_unwind_ip : AT(ADDR(.orc_unwind_ip) - LOAD_OFFSET) {
+		BOUNDED_SECTION_BY(.orc_unwind_ip, _orc_unwind_ip)
+	} . = ALIGN(2);
+	.orc_unwind : AT(ADDR(.orc_unwind) - LOAD_OFFSET) {
+		BOUNDED_SECTION_BY(.orc_unwind, _orc_unwind)
+	} . = ALIGN(4);
+	text_size = _etext - _stext;
 
 	. = ALIGN(SECTION_ALIGN);
 	__init_begin = .;
@@ -132,7 +151,18 @@ SECTIONS
 	. = ALIGN(SECTION_ALIGN);
 	_data = .;
 
-	RW_DATA(L1_CACHE_BYTES, PAGE_SIZE, THREAD_ALIGN)
+	. = ALIGN(PAGE_SIZE);
+	.data : AT(ADDR(.data) - LOAD_OFFSET) {
+		INIT_TASK_DATA(THREAD_ALIGN)
+		NOSAVE_DATA
+		PAGE_ALIGNED_DATA(PAGE_SIZE)
+		CACHE_HOT_DATA(L1_CACHE_BYTES)
+		CACHELINE_ALIGNED_DATA(L1_CACHE_BYTES)
+		READ_MOSTLY_DATA(L1_CACHE_BYTES)
+		DATA_DATA
+		CONSTRUCTORS
+	} :data
+	BUG_TABLE
 	.sdata : {
 		__global_pointer$ = . + 0x800;
 		*(.sdata*)
@@ -155,6 +185,21 @@ SECTIONS
 	__pecoff_data_raw_size = ABSOLUTE(. - __pecoff_text_end);
 	__pecoff_data_raw_end = ABSOLUTE(.);
 #endif
+
+	/*
+	 * The .orc_lookup section is written to by unwind_init() during
+	 * early boot, so it must reside in a writable data segment.
+	 * Place it here in the data segment, separate from the read-only
+	 * .orc_header/.orc_unwind_ip/.orc_unwind sections which stay in
+	 * the text segment.
+	 */
+	. = ALIGN(4);
+	.orc_lookup : AT(ADDR(.orc_lookup) - LOAD_OFFSET) {
+		orc_lookup = .;
+		. += (((text_size + LOOKUP_BLOCK_SIZE - 1) /
+			LOOKUP_BLOCK_SIZE) + 1) * 4;
+		orc_lookup_end = .;
+	}
 
 	/* End of data section */
 	_edata = .;

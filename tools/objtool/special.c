@@ -16,6 +16,16 @@
 #include <objtool/special.h>
 #include <objtool/warn.h>
 
+/*
+ * The section name for ALTERNATIVE patching tables.  Most architectures
+ * use ".altinstructions", but some (e.g. RISC-V) use a different name.
+ * Architectures can override this by defining ALT_SECTION_NAME in their
+ * arch/special.h.
+ */
+#ifndef ALT_SECTION_NAME
+#define ALT_SECTION_NAME ".altinstructions"
+#endif
+
 struct special_entry {
 	const char *sec;
 	bool group, jump_or_nop;
@@ -27,7 +37,7 @@ struct special_entry {
 
 static const struct special_entry entries[] = {
 	{
-		.sec = ".altinstructions",
+		.sec = ALT_SECTION_NAME,
 		.group = true,
 		.size = ALT_ENTRY_SIZE,
 		.orig = ALT_ORIG_OFFSET,
@@ -53,13 +63,37 @@ static const struct special_entry entries[] = {
 	{},
 };
 
-void __weak arch_handle_alternative(struct special_alt *alt)
+void __weak arch_handle_alternative(struct elf *elf, struct section *sec,
+				     unsigned long entry_off,
+				     struct special_alt *alt)
 {
 }
 
-static void reloc_to_sec_off(struct reloc *reloc, struct section **sec,
-			     unsigned long *off)
+static void reloc_to_sec_off(struct reloc *reloc, struct section *lookup_sec,
+			     struct section **sec, unsigned long *off)
 {
+	/*
+	 * Some architectures (e.g. RISC-V) encode PC-relative offsets in data
+	 * sections using a pair of relocations at the same address:
+	 *   ADD reloc: sym -> target section/symbol  (what we want)
+	 *   SUB reloc: sym -> current section symbol (used to subtract PC)
+	 *
+	 * find_reloc_by_dest() may return the SUB reloc whose sym->sec equals
+	 * lookup_sec itself.  In that case, scan for a sibling reloc at the
+	 * same offset whose sym->sec differs -- that is the ADD reloc.
+	 */
+	if (reloc->sym->sec == lookup_sec && lookup_sec->rsec) {
+		struct reloc *r;
+		unsigned long target_off = reloc_offset(reloc);
+
+		for_each_reloc(lookup_sec->rsec, r) {
+			if (reloc_offset(r) == target_off && r->sym->sec != lookup_sec) {
+				reloc = r;
+				break;
+			}
+		}
+	}
+
 	*sec = reloc->sym->sec;
 	*off = reloc->sym->offset + reloc_addend(reloc);
 }
@@ -91,9 +125,9 @@ static int get_alt_entry(struct elf *elf, const struct special_entry *entry,
 		return -1;
 	}
 
-	reloc_to_sec_off(orig_reloc, &alt->orig_sec, &alt->orig_off);
+	reloc_to_sec_off(orig_reloc, sec, &alt->orig_sec, &alt->orig_off);
 
-	arch_handle_alternative(alt);
+	arch_handle_alternative(elf, sec, offset, alt);
 
 	if (!entry->group || alt->new_len) {
 		new_reloc = find_reloc_by_dest(elf, sec, offset + entry->new);
@@ -102,7 +136,7 @@ static int get_alt_entry(struct elf *elf, const struct special_entry *entry,
 			return -1;
 		}
 
-		reloc_to_sec_off(new_reloc, &alt->new_sec, &alt->new_off);
+		reloc_to_sec_off(new_reloc, sec, &alt->new_sec, &alt->new_off);
 
 		/* _ASM_EXTABLE_EX hack */
 		if (alt->new_off >= 0x7ffffff0)

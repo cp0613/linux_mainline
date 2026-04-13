@@ -5,6 +5,7 @@
 
 #include <linux/linkage.h>
 #include <asm/asm.h>
+#include <asm/unwind_hints.h>
 
 SYM_FUNC_START(__memmove)
 	/*
@@ -312,6 +313,10 @@ SYM_FUNC_START(__memmove)
 	ret
 
 SYM_FUNC_END(__memmove)
+STACK_FRAME_NON_STANDARD(__memmove)
+STACK_FRAME_NON_STANDARD(memmove)
+STACK_FRAME_NON_STANDARD(__pi_memmove)
+STACK_FRAME_NON_STANDARD(__pi___memmove)
 SYM_FUNC_ALIAS_WEAK(memmove, __memmove)
 SYM_FUNC_ALIAS(__pi_memmove, __memmove)
 SYM_FUNC_ALIAS(__pi___memmove, __memmove)

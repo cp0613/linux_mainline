@@ -15,6 +15,7 @@
 #include <linux/pgtable.h>
 #include <asm/alternative.h>
 #include <asm/sections.h>
+#include <asm/unwind.h>
 
 struct used_bucket {
 	struct list_head head;
@@ -897,10 +898,27 @@ int module_finalize(const Elf_Ehdr *hdr,
 		    struct module *me)
 {
 	const Elf_Shdr *s;
+#ifdef CONFIG_UNWINDER_ORC
+	const Elf_Shdr *orc = NULL, *orc_ip = NULL;
+	const char *secstrs = (void *)hdr + sechdrs[hdr->e_shstrndx].sh_offset;
+#endif
 
 	s = find_section(hdr, sechdrs, ".alternative");
 	if (s)
 		apply_module_alternatives((void *)s->sh_addr, s->sh_size);
+
+#ifdef CONFIG_UNWINDER_ORC
+	for (s = sechdrs; s < sechdrs + hdr->e_shnum; s++) {
+		if (!strcmp(".orc_unwind", secstrs + s->sh_name))
+			orc = s;
+		if (!strcmp(".orc_unwind_ip", secstrs + s->sh_name))
+			orc_ip = s;
+	}
+
+	if (orc && orc_ip)
+		unwind_module_init(me, (void *)orc_ip->sh_addr, orc_ip->sh_size,
+				   (void *)orc->sh_addr, orc->sh_size);
+#endif
 
 	return 0;
 }

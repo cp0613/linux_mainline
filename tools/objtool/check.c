@@ -1095,6 +1095,15 @@ static int add_ignores(struct objtool_file *file)
 			func = reloc->sym;
 			break;
 
+		case STT_NOTYPE:
+			/*
+			 * SYM_CODE_START functions (e.g. assembly entry points)
+			 * have type STT_NOTYPE.  Allow them to be marked as
+			 * non-standard so objtool skips their unreachable checks.
+			 */
+			func = reloc->sym;
+			break;
+
 		case STT_SECTION:
 			func = find_func_by_offset(reloc->sym->sec, reloc_addend(reloc));
 			if (!func)
@@ -1347,6 +1356,20 @@ __weak bool arch_is_rethunk(struct symbol *sym)
 __weak bool arch_is_embedded_insn(struct symbol *sym)
 {
 	return false;
+}
+
+/*
+ * For architectures that encode calls as a two-instruction sequence (e.g.
+ * RISC-V auipc+jalr), the second instruction is decoded as INSN_CALL_DYNAMIC
+ * because the relocation is on the first instruction. Provide an arch hook
+ * so the architecture can resolve the call destination symbol from surrounding
+ * context (e.g. by looking at the relocation on the preceding instruction).
+ * Returns the destination symbol, or NULL if not determinable.
+ */
+__weak struct symbol *arch_dynamic_call_dest(struct objtool_file *file,
+					     struct instruction *insn)
+{
+	return NULL;
 }
 
 static struct reloc *insn_reloc(struct objtool_file *file, struct instruction *insn)
@@ -1702,8 +1725,22 @@ static int add_call_destinations(struct objtool_file *file)
 
 	for_each_insn(file, insn) {
 		struct symbol *func = insn_func(insn);
-		if (insn->type != INSN_CALL)
+		if (insn->type != INSN_CALL && insn->type != INSN_CALL_DYNAMIC)
 			continue;
+
+		if (insn->type == INSN_CALL_DYNAMIC) {
+			/*
+			 * For two-instruction call pairs like RISC-V auipc+jalr,
+			 * the relocation is on the first instruction (auipc) while
+			 * the second (jalr) is INSN_CALL_DYNAMIC. Ask the arch to
+			 * resolve the destination symbol from the surrounding
+			 * context so we can identify noreturn calls.
+			 */
+			dest = arch_dynamic_call_dest(file, insn);
+			if (dest && dead_end_function(file, dest))
+				insn->dead_end = true;
+			continue;
+		}
 
 		reloc = insn_reloc(file, insn);
 		if (!reloc) {
@@ -1975,6 +2012,17 @@ static int add_special_section_alts(struct objtool_file *file)
 		orig_insn = find_insn(file, special_alt->orig_sec,
 				      special_alt->orig_off);
 		if (!orig_insn) {
+			/*
+			 * Some architectures (e.g. RISC-V) use ALTERNATIVE in data
+			 * sections (e.g. function-pointer tables in .rodata) to
+			 * patch pointer values at boot time.  Such entries have an
+			 * orig_sec that is not a text section and therefore have no
+			 * corresponding instruction object.  Skip them silently.
+			 */
+			if (!is_text_sec(special_alt->orig_sec)) {
+				free(special_alt);
+				continue;
+			}
 			ERROR_FUNC(special_alt->orig_sec, special_alt->orig_off,
 				   "special: can't find orig instruction");
 			return -1;
@@ -2051,6 +2099,17 @@ __weak unsigned long arch_jump_table_sym_offset(struct reloc *reloc, struct relo
 	return reloc->sym->offset + reloc_addend(reloc);
 }
 
+/*
+ * Some architectures use auxiliary relocations at the same offset as the
+ * primary switch-table reloc (e.g. RISC-V R_RISCV_SUB32 paired with
+ * R_RISCV_ADD32).  The arch can return true from this hook to have
+ * add_jump_table() skip those auxiliary entries.
+ */
+__weak bool arch_jump_table_reloc_skip(struct reloc *reloc, struct reloc *table)
+{
+	return false;
+}
+
 static int add_jump_table(struct objtool_file *file, struct instruction *insn)
 {
 	unsigned long table_size = insn_jump_table_size(insn);
@@ -2077,6 +2136,10 @@ static int add_jump_table(struct objtool_file *file, struct instruction *insn)
 		/* Make sure the table entries are consecutive: */
 		if (prev_offset && reloc_offset(reloc) != prev_offset + arch_reloc_size(reloc))
 			break;
+
+		/* Skip auxiliary relocs (e.g. R_RISCV_SUB32 paired with R_RISCV_ADD32): */
+		if (arch_jump_table_reloc_skip(reloc, table))
+			goto next;
 
 		sym_offset = arch_jump_table_sym_offset(reloc, table);
 
@@ -2285,6 +2348,25 @@ static int read_unwind_hints(struct objtool_file *file)
 		if (!reloc) {
 			ERROR("can't find reloc for unwind_hints[%d]", i);
 			return -1;
+		}
+
+		/*
+		 * Some architectures (e.g. RISC-V) encode PC-relative offsets using
+		 * a pair of relocations at the same address (ADD + SUB).  In that
+		 * case find_reloc_by_dest() may return the SUB reloc whose sym->sec
+		 * equals the unwind_hints section itself.  Look for a sibling reloc
+		 * at the same offset that points to a different section.
+		 */
+		if (reloc->sym->sec == sec && sec->rsec) {
+			struct reloc *r;
+			unsigned long hint_off = reloc_offset(reloc);
+
+			for_each_reloc(sec->rsec, r) {
+				if (reloc_offset(r) == hint_off && r->sym->sec != sec) {
+					reloc = r;
+					break;
+				}
+			}
 		}
 
 		offset = reloc->sym->offset + reloc_addend(reloc);
@@ -4345,6 +4427,14 @@ static bool ignore_unreachable_insn(struct objtool_file *file, struct instructio
 		return true;
 
 	/*
+	 * SYM_CODE_START symbols have STT_NOTYPE, so insn_func() returns NULL
+	 * for their instructions.  Check insn->sym directly so that
+	 * STACK_FRAME_NON_STANDARD annotations on such symbols are honored.
+	 */
+	if (insn->sym && insn->sym->ignore)
+		return true;
+
+	/*
 	 * Ignore alternative replacement instructions.  This can happen
 	 * when a whitelisted function uses one of the ALTERNATIVE macros.
 	 */
@@ -4372,6 +4462,153 @@ static bool ignore_unreachable_insn(struct objtool_file *file, struct instructio
 	     (insn->type == INSN_JUMP_UNCONDITIONAL &&
 	      insn->jump_dest && insn->jump_dest->type == INSN_BUG)))
 		return true;
+
+	/*
+	 * GCC sometimes emits an unconditional jump after a noreturn trap
+	 * (e.g. __builtin_trap / ebreak) as a safety net.  Treat such a
+	 * jump as dead code rather than triggering a spurious unreachable
+	 * instruction warning.
+	 *
+	 * On some architectures (e.g. RISC-V) GCC also emits additional
+	 * instructions after the trap, such as disabling interrupts,
+	 * resuming loop control flow, or even function calls.  Since a
+	 * BUG/trap instruction never returns normally, any code after it
+	 * is dead and should not trigger warnings.
+	 *
+	 * Walk backwards past all instructions in the same section to find
+	 * a preceding INSN_BUG.  Stop at the function entry.
+	 *
+	 * Note: we intentionally do NOT stop at INSN_RETURN.  GCC on
+	 * RISC-V may place reachable code after a 'ret' instruction
+	 * when the 'ret' follows an 'ebreak' (BUG).  The code after the
+	 * 'ret' is reachable from other branch paths in the function,
+	 * but objtool's validate_branch stops at dead_end (ebreak) and
+	 * doesn't mark the fall-through code as visited.  Skipping past
+	 * 'ret' in the backward scan allows us to find the preceding
+	 * INSN_BUG and suppress the false warning.
+	 */
+	{
+		struct instruction *prev = prev_insn;
+
+		while (prev) {
+			if (prev->type == INSN_BUG)
+				return true;
+			if (func && prev->offset == func->offset)
+				break;
+			prev = prev_insn_same_sec(file, prev);
+		}
+	}
+
+	/*
+	 * GCC on RISC-V may also place code after a 'ret' that is reached
+	 * from a BUG instruction located *after* the ret.  For example:
+	 *
+	 *   ret
+	 *   .Lcold:                  <- objtool: unreachable
+	 *   call ...
+	 *   ebreak                   <- BUG
+	 *   beq ..., .Lcold          <- jump back to code after ret
+	 *
+	 * Since validate_branch stops at the BUG (dead_end), the code
+	 * after 'ret' that is reachable from post-BUG jumps is not marked
+	 * visited.  If the previous instruction is a RET (or is in the
+	 * region right after a RET), scan forward to find a BUG that has
+	 * a jump back to the region between the RET and the BUG.
+	 */
+	if (func) {
+		struct instruction *ret_insn = NULL;
+
+		/*
+		 * Find the nearest preceding RET.  Also check if this insn
+		 * is directly after a RET (prev is RET) or in a sequence
+		 * after a RET (walk back to find one within a few insns).
+		 */
+		if (prev_insn && prev_insn->type == INSN_RETURN) {
+			ret_insn = prev_insn;
+		} else if (prev_insn) {
+			struct instruction *p = prev_insn;
+			int max_back = 5;
+
+			while (p && max_back-- > 0) {
+				if (p->type == INSN_RETURN) {
+					ret_insn = p;
+					break;
+			}
+				if (p->type == INSN_JUMP_CONDITIONAL ||
+				    p->type == INSN_JUMP_UNCONDITIONAL ||
+				    p->type == INSN_CALL)
+					break;
+				p = prev_insn_same_sec(file, p);
+			}
+		}
+
+		if (ret_insn) {
+			struct instruction *next = next_insn_same_sec(file, insn);
+			int max_scan = 20;
+
+			while (next && max_scan-- > 0 && insn_func(next) == func) {
+				if (next->type == INSN_BUG) {
+					struct instruction *post_bug = next_insn_same_sec(file, next);
+					int max_post = 10;
+
+					while (post_bug && max_post-- > 0 &&
+					       insn_func(post_bug) == func) {
+						if (post_bug->type == INSN_JUMP_CONDITIONAL ||
+						    post_bug->type == INSN_JUMP_UNCONDITIONAL) {
+							if (post_bug->jump_dest &&
+							    post_bug->jump_dest->offset >= ret_insn->offset &&
+							    post_bug->jump_dest->offset <= next->offset)
+								return true;
+						}
+						post_bug = next_insn_same_sec(file, post_bug);
+					}
+				}
+				next = next_insn_same_sec(file, next);
+			}
+		}
+	}
+
+	/*
+	 * GCC on RISC-V may also generate code that is only reachable
+	 * from a branch located after a BUG instruction.  For example:
+	 *
+	 *   .Lloop:
+	 *     ...                    <- objtool: unreachable
+	 *     addiw  s3, s3, 1
+	 *     ebreak                 <- BUG (dead_end)
+	 *     blt    s3, s5, .Lloop  <- branch back to unreachable code
+	 *
+	 * Since validate_branch stops at the BUG (dead_end), the branch
+	 * after it is never visited and the code before the BUG that it
+	 * targets is reported as unreachable.  Scan forward from the
+	 * unreachable instruction to find a BUG, then check if any branch
+	 * after the BUG jumps back to the region between the unreachable
+	 * instruction and the BUG.
+	 */
+	if (func) {
+		struct instruction *next = insn;
+		int max_scan = 30;
+
+		while (next && max_scan-- > 0 && insn_func(next) == func) {
+			if (next->type == INSN_BUG) {
+				struct instruction *post_bug = next_insn_same_sec(file, next);
+				int max_post = 10;
+
+				while (post_bug && max_post-- > 0 &&
+				       insn_func(post_bug) == func) {
+					if (post_bug->type == INSN_JUMP_CONDITIONAL ||
+					    post_bug->type == INSN_JUMP_UNCONDITIONAL) {
+						if (post_bug->jump_dest &&
+						    insn->offset >= post_bug->jump_dest->offset &&
+						    insn->offset <= next->offset)
+							return true;
+					}
+					post_bug = next_insn_same_sec(file, post_bug);
+				}
+			}
+			next = next_insn_same_sec(file, next);
+		}
+	}
 
 	/*
 	 * Check if this (or a subsequent) instruction is related to

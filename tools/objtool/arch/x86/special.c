@@ -9,7 +9,9 @@
 /* cpu feature name array generated from cpufeatures.h */
 #include "cpu-feature-names.c"
 
-void arch_handle_alternative(struct special_alt *alt)
+void arch_handle_alternative(struct elf *elf, struct section *sec,
+			     unsigned long entry_off,
+			     struct special_alt *alt)
 {
 	static struct special_alt *group, *prev;
 

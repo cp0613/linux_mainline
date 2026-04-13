@@ -95,6 +95,9 @@ bool arch_is_retpoline(struct symbol *sym);
 bool arch_is_rethunk(struct symbol *sym);
 bool arch_is_embedded_insn(struct symbol *sym);
 
+struct symbol *arch_dynamic_call_dest(struct objtool_file *file,
+				      struct instruction *insn);
+
 int arch_rewrite_retpolines(struct objtool_file *file);
 
 bool arch_pc_relative_reloc(struct reloc *reloc);
@@ -102,6 +105,7 @@ bool arch_absolute_reloc(struct elf *elf, struct reloc *reloc);
 
 unsigned int arch_reloc_size(struct reloc *reloc);
 unsigned long arch_jump_table_sym_offset(struct reloc *reloc, struct reloc *table);
+bool arch_jump_table_reloc_skip(struct reloc *reloc, struct reloc *table);
 
 extern const char *arch_reg_name[CFI_NUM_REGS];
 

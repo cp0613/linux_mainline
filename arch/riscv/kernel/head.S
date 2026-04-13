@@ -16,10 +16,13 @@
 #include <asm/scs.h>
 #include <asm/xip_fixup.h>
 #include <asm/usercfi.h>
+#include <asm/unwind_hints.h>
 #include "efi-header.S"
 
 __HEAD
 SYM_CODE_START(_start)
+	UNWIND_HINT_END_OF_STACK
+	STACK_FRAME_NON_STANDARD _start
 	/*
 	 * Image header expected by Linux boot-loaders. The image header data
 	 * structure is described in asm/image.h.
@@ -215,6 +218,7 @@ secondary_start_sbi:
 SYM_CODE_END(_start)
 
 SYM_CODE_START(_start_kernel)
+	UNWIND_HINT_END_OF_STACK
 	/* Mask all interrupts */
 	csrw CSR_IE, zero
 	csrw CSR_IP, zero

@@ -30,7 +30,9 @@ struct special_alt {
 
 int special_get_alts(struct elf *elf, struct list_head *alts);
 
-void arch_handle_alternative(struct special_alt *alt);
+void arch_handle_alternative(struct elf *elf, struct section *sec,
+			     unsigned long entry_off,
+			     struct special_alt *alt);
 
 bool arch_support_alt_relocation(struct special_alt *special_alt,
 				 struct instruction *insn,

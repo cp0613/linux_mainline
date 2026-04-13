@@ -33,6 +33,7 @@
 #include <asm/thread_info.h>
 #include <asm/vector.h>
 #include <asm/irq_stack.h>
+#include <asm/unwind_hints.h>
 
 int show_unhandled_signals = 1;
 
@@ -367,6 +368,7 @@ void do_trap_ecall_u(struct pt_regs *regs)
 	}
 
 }
+STACK_FRAME_NON_STANDARD(do_trap_ecall_u);
 
 #define CFI_TVAL_FCFI_CODE	2
 #define CFI_TVAL_BCFI_CODE	3

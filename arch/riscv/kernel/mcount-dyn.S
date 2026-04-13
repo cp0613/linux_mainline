@@ -204,7 +204,7 @@ SYM_INNER_LABEL(ftrace_caller_direct, SYM_L_LOCAL)
 SYM_FUNC_END(ftrace_caller)
 
 #ifdef CONFIG_DYNAMIC_FTRACE_WITH_DIRECT_CALLS
-SYM_CODE_START(ftrace_stub_direct_tramp)
+SYM_FUNC_START(ftrace_stub_direct_tramp)
 	jr	t0
-SYM_CODE_END(ftrace_stub_direct_tramp)
+SYM_FUNC_END(ftrace_stub_direct_tramp)
 #endif /* CONFIG_DYNAMIC_FTRACE_WITH_DIRECT_CALLS */

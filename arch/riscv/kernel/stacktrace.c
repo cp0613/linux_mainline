@@ -13,6 +13,7 @@
 #include <linux/ftrace.h>
 
 #include <asm/stacktrace.h>
+#include <asm/unwind.h>
 
 #ifdef CONFIG_FRAME_POINTER
 
@@ -224,3 +225,108 @@ void arch_stack_walk_user(stack_trace_consume_fn consume_entry, void *cookie,
 	while (fp && !(fp & 0x7))
 		fp = unwind_user_frame(consume_entry, cookie, fp, 0);
 }
+
+/*
+ * Stack info helpers for the ORC unwinder.
+ * These functions identify what kind of stack a given SP belongs to.
+ */
+bool in_task_stack(unsigned long stack, struct task_struct *task,
+		   struct stack_info *info)
+{
+	unsigned long begin = (unsigned long)task_stack_page(task);
+	unsigned long end   = begin + THREAD_SIZE;
+
+	if (stack < begin || stack >= end)
+		return false;
+
+	info->type	= STACK_TYPE_TASK;
+	info->begin	= begin;
+	info->end	= end;
+	info->next_sp	= 0;
+
+	return true;
+}
+
+bool in_irq_stack(unsigned long stack, struct stack_info *info)
+{
+#ifdef CONFIG_VMAP_STACK
+	/*
+	 * RISC-V doesn't have a separate per-CPU IRQ stack in the
+	 * traditional sense; overflow_stack is for stack overflow handling.
+	 * Extend this when a separate IRQ stack is implemented.
+	 */
+#endif
+	return false;
+}
+
+int get_stack_info(unsigned long stack, struct task_struct *task,
+		   struct stack_info *info)
+{
+	if (!task)
+		task = current;
+
+	if (in_task_stack(stack, task, info))
+		return 0;
+
+	if (in_irq_stack(stack, info))
+		return 0;
+
+	info->type = STACK_TYPE_UNKNOWN;
+	return -EINVAL;
+}
+
+#ifdef CONFIG_UNWINDER_ORC
+/*
+ * arch_stack_walk_reliable - reliable stack trace for livepatch.
+ *
+ * This function walks the call stack using the ORC unwinder.  It is
+ * "reliable" in the sense that it returns -EINVAL whenever it encounters
+ * anything unexpected (missing ORC data, corrupt frame, etc.) rather than
+ * silently producing incorrect output.
+ *
+ * This is required by the livepatch consistency model to determine whether
+ * a task is safe to patch (i.e., not currently executing a function that is
+ * being patched).
+ */
+int arch_stack_walk_reliable(stack_trace_consume_fn consume_entry,
+			     void *cookie, struct task_struct *task)
+{
+	unsigned long addr;
+	struct pt_regs dummyregs;
+	struct pt_regs *regs = &dummyregs;
+	struct unwind_state state;
+
+	if (task == current) {
+		regs->sp  = (unsigned long)__builtin_frame_address(0);
+		regs->epc = (unsigned long)__builtin_return_address(0);
+		regs->s0  = 0;
+	} else {
+		regs->sp  = task->thread.sp;
+		regs->epc = task->thread.ra;
+		regs->s0  = task->thread.s[0];
+	}
+	regs->ra = 0;
+
+	for (unwind_start(&state, task, regs);
+	     !unwind_done(&state) && !unwind_error(&state);
+	     unwind_next_frame(&state)) {
+		addr = unwind_get_return_address(&state);
+
+		/*
+		 * A NULL or invalid return address probably means there's some
+		 * generated code which __kernel_text_address() doesn't know about.
+		 */
+		if (!addr)
+			return -EINVAL;
+
+		if (!consume_entry(cookie, addr))
+			return -EINVAL;
+	}
+
+	/* Check for stack corruption */
+	if (unwind_error(&state))
+		return -EINVAL;
+
+	return 0;
+}
+#endif /* CONFIG_UNWINDER_ORC */
