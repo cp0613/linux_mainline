@@ -29,6 +29,11 @@ KASAN_SANITIZE_alternative.o := n
 KASAN_SANITIZE_cpufeature.o := n
 KASAN_SANITIZE_sbi_ecall.o := n
 endif
+ifdef CONFIG_KCSAN
+KCSAN_SANITIZE_alternative.o := n
+KCSAN_SANITIZE_cpufeature.o := n
+KCSAN_SANITIZE_sbi_ecall.o := n
+endif
 ifdef CONFIG_FORTIFY_SOURCE
 CFLAGS_alternative.o += -D__NO_FORTIFY
 CFLAGS_cpufeature.o += -D__NO_FORTIFY

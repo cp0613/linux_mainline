@@ -73,7 +73,7 @@
 #error "HZ > MAX_NDELAY_HZ"
 #endif
 
-void __delay(unsigned long cycles)
+void __no_kcsan __delay(unsigned long cycles)
 {
 	u64 t0 = get_cycles();
 
@@ -82,7 +82,7 @@ void __delay(unsigned long cycles)
 }
 EXPORT_SYMBOL(__delay);
 
-void udelay(unsigned long usecs)
+void __no_kcsan udelay(unsigned long usecs)
 {
 	u64 ucycles = (u64)usecs * lpj_fine * UDELAY_MULT;
 	u64 n;
@@ -99,7 +99,7 @@ void udelay(unsigned long usecs)
 }
 EXPORT_SYMBOL(udelay);
 
-void ndelay(unsigned long nsecs)
+void __no_kcsan ndelay(unsigned long nsecs)
 {
 	/*
 	 * This doesn't bother checking for overflow, as it won't happen (it's
