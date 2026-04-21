@@ -111,6 +111,7 @@ obj-$(CONFIG_MEMCG) += bpf_memcontrol.o
 endif
 obj-$(CONFIG_CGROUP_HUGETLB) += hugetlb_cgroup.o
 obj-$(CONFIG_GUP_TEST) += gup_test.o
+obj-$(CONFIG_LRU_GEN_NONLEAF_PMD_TEST) += lru_gen_nonleaf_pmd_test.o
 obj-$(CONFIG_DMAPOOL_TEST) += dmapool_test.o
 obj-$(CONFIG_MEMORY_FAILURE) += memory-failure.o
 obj-$(CONFIG_HWPOISON_INJECT) += hwpoison-inject.o

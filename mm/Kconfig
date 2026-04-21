@@ -1288,6 +1288,22 @@ config GUP_TEST
 comment "GUP_TEST needs to have DEBUG_FS enabled"
 	depends on !GUP_TEST && !DEBUG_FS
 
+config LRU_GEN_NONLEAF_PMD_TEST
+	tristate "Test module for LRU Gen non-leaf PMD young support"
+	depends on DEBUG_FS && MMU
+	help
+	  Provides a test module for measuring the impact of the non-leaf
+	  PMD young bit feature on page table walking performance. This
+	  feature is used by the multi-generation LRU (MGLRU) page reclaim
+	  code to skip scanning PTEs under non-young PMD entries.
+
+	  The module provides debugfs interfaces to:
+	  - Check platform capability for non-leaf PMD young bits
+	  - Run page table walk benchmarks and collect statistics
+	  - Test pmdp_test_and_clear_young() performance
+
+	  If unsure, say N.
+
 config GUP_GET_PXX_LOW_HIGH
 	bool
 
