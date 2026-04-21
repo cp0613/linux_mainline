@@ -298,6 +298,17 @@ static int get_stack_skipnr(const unsigned long stack_entries[], int num_entries
 		}
 
 		/*
+		 * Never show KCSAN report internals (e.g. print_report). On
+		 * architectures with mandatory frame pointers (e.g. RISC-V,
+		 * which selects ARCH_WANT_FRAME_POINTERS), these functions
+		 * appear as distinct stack entries and must be filtered out.
+		 */
+		if (strnstr(buf, "print_report", len) ||
+		    strnstr(buf, "prepare_report", len) ||
+		    strnstr(buf, "release_report", len))
+			continue;
+
+		/*
 		 * No match for runtime functions -- @skip entries to skip to
 		 * get to first frame of interest.
 		 */
