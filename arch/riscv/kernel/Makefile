@@ -115,6 +115,8 @@ obj-$(CONFIG_VMCORE_INFO)	+= vmcore_info.o
 
 obj-$(CONFIG_JUMP_LABEL)	+= jump_label.o
 
+obj-$(CONFIG_HAVE_STATIC_CALL)	+= static_call.o
+
 obj-$(CONFIG_CFI)		+= cfi.o
 
 obj-$(CONFIG_EFI)		+= efi.o
