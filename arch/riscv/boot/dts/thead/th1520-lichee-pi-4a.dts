@@ -103,6 +103,20 @@
 
 };
 
+&dpu {
+	status = "okay";
+};
+
+&hdmi {
+	status = "okay";
+};
+
+&hdmi_out_port {
+	hdmi_out_con: endpoint {
+		remote-endpoint = <&hdmi_con_in>;
+	};
+};
+
 &padctrl1_apsys {
 	i2c1_pins: i2c1-0 {
 		i2c-pins {
@@ -177,20 +191,6 @@
 	mmc-pwrseq = <&wifi_pwrseq>;
 	non-removable;
 	status = "okay";
-};
-
-&dpu {
-	status = "okay";
-};
-
-&hdmi {
-	status = "okay";
-};
-
-&hdmi_out_port {
-	hdmi_out_con: endpoint {
-		remote-endpoint = <&hdmi_con_in>;
-	};
 };
 
 &uart0 {
