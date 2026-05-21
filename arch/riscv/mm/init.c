@@ -357,6 +357,7 @@ struct pt_alloc_ops pt_ops __meminitdata;
 pgd_t swapper_pg_dir[PTRS_PER_PGD] __page_aligned_bss;
 pgd_t trampoline_pg_dir[PTRS_PER_PGD] __page_aligned_bss;
 static pte_t fixmap_pte[PTRS_PER_PTE] __page_aligned_bss;
+static pte_t trampoline_pte[PTRS_PER_PTE] __page_aligned_bss;
 
 pgd_t early_pg_dir[PTRS_PER_PGD] __initdata __aligned(PAGE_SIZE);
 
@@ -364,6 +365,7 @@ pgd_t early_pg_dir[PTRS_PER_PGD] __initdata __aligned(PAGE_SIZE);
 #define pt_ops			(*(struct pt_alloc_ops *)XIP_FIXUP(&pt_ops))
 #define trampoline_pg_dir      ((pgd_t *)XIP_FIXUP(trampoline_pg_dir))
 #define fixmap_pte             ((pte_t *)XIP_FIXUP(fixmap_pte))
+#define trampoline_pte         ((pte_t *)XIP_FIXUP(trampoline_pte))
 #define early_pg_dir           ((pgd_t *)XIP_FIXUP(early_pg_dir))
 #endif /* CONFIG_XIP_KERNEL */
 
@@ -419,13 +421,22 @@ static inline pte_t *__meminit get_pte_virt_late(phys_addr_t pa)
 	return (pte_t *) __va(pa);
 }
 
+/*
+ * Early PTE allocation pool: used before the memory allocator is available.
+ * Each PTE table covers PMD_SIZE (2MB on rv64, 4MB on rv32), so we need
+ * one PTE table per PMD_SIZE of kernel image. 32 tables cover up to 64MB
+ * (rv64) or 128MB (rv32) which should be sufficient for any practical
+ * kernel image.
+ */
+#define EARLY_PTE_TABLE_COUNT  32
+static pte_t early_pte_pool[EARLY_PTE_TABLE_COUNT][PTRS_PER_PTE] __initdata __aligned(PAGE_SIZE);
+static int early_pte_alloc_index __initdata;
+
 static inline phys_addr_t __init alloc_pte_early(uintptr_t va)
 {
-	/*
-	 * We only create PMD or PGD early mappings so we
-	 * should never reach here with MMU disabled.
-	 */
-	BUG();
+	BUG_ON(early_pte_alloc_index >= EARLY_PTE_TABLE_COUNT);
+
+	return (uintptr_t)&early_pte_pool[early_pte_alloc_index++];
 }
 
 static inline phys_addr_t __init alloc_pte_fixmap(uintptr_t va)
@@ -459,11 +470,13 @@ static void __meminit create_pte_mapping(pte_t *ptep, uintptr_t va, phys_addr_t 
 
 #ifndef __PAGETABLE_PMD_FOLDED
 
+static pte_t trampoline_pte[PTRS_PER_PTE] __page_aligned_bss;
 static pmd_t trampoline_pmd[PTRS_PER_PMD] __page_aligned_bss;
 static pmd_t fixmap_pmd[PTRS_PER_PMD] __page_aligned_bss;
 static pmd_t early_pmd[PTRS_PER_PMD] __initdata __aligned(PAGE_SIZE);
 
 #ifdef CONFIG_XIP_KERNEL
+#define trampoline_pte ((pte_t *)XIP_FIXUP(trampoline_pte))
 #define trampoline_pmd ((pmd_t *)XIP_FIXUP(trampoline_pmd))
 #define fixmap_pmd     ((pmd_t *)XIP_FIXUP(fixmap_pmd))
 #define early_pmd      ((pmd_t *)XIP_FIXUP(early_pmd))
@@ -959,14 +972,32 @@ static void __init create_kernel_page_table(pgd_t *pgdir,
 static void __init create_kernel_page_table(pgd_t *pgdir, bool early)
 {
 	uintptr_t va, end_va;
+	pgprot_t prot;
 
 	end_va = kernel_map.virt_addr + kernel_map.size;
-	for (va = kernel_map.virt_addr; va < end_va; va += PMD_SIZE)
-		create_pgd_mapping(pgdir, va,
-				   kernel_map.phys_addr + (va - kernel_map.virt_addr),
-				   PMD_SIZE,
-				   early ?
-					PAGE_KERNEL_EXEC : pgprot_from_va(va));
+
+	if (IS_ALIGNED(kernel_map.phys_addr, PMD_SIZE)) {
+		/* Phys address is PMD-aligned: use PMD huge pages */
+		for (va = kernel_map.virt_addr; va < end_va; va += PMD_SIZE) {
+			prot = early ? PAGE_KERNEL_EXEC : pgprot_from_va(va);
+			create_pgd_mapping(pgdir, va,
+					   kernel_map.phys_addr + (va - kernel_map.virt_addr),
+					   PMD_SIZE, prot);
+		}
+	} else {
+		/*
+		 * Phys address is not PMD-aligned: use PTE-level mapping.
+		 * Since the VA-PA offset means no PMD-aligned VA maps to
+		 * a PMD-aligned PA, we cannot use PMD huge pages at all.
+		 * Fall back to PAGE_SIZE granularity for the entire kernel.
+		 */
+		for (va = kernel_map.virt_addr; va < end_va; va += PAGE_SIZE) {
+			prot = early ? PAGE_KERNEL_EXEC : pgprot_from_va(va);
+			create_pgd_mapping(pgdir, va,
+					   kernel_map.phys_addr + (va - kernel_map.virt_addr),
+					   PAGE_SIZE, prot);
+		}
+	}
 }
 #endif
 
@@ -1099,12 +1130,12 @@ asmlinkage void __init setup_vm(uintptr_t dtb_pa)
 			kaslr_seed = __pi_get_kaslr_seed(dtb_pa);
 		/*
 		 * Compute the number of positions available: we are limited
-		 * by the early page table that only has one PUD and we must
-		 * be aligned on PMD_SIZE.
+		 * by the early page table that only has one PUD. With PTE-level
+		 * early mapping, we can use PAGE_SIZE granularity.
 		 */
-		nr_pos = (PUD_SIZE - kernel_size) / PMD_SIZE;
+		nr_pos = (PUD_SIZE - kernel_size) / PAGE_SIZE;
 
-		kernel_map.virt_offset = (kaslr_seed % nr_pos) * PMD_SIZE;
+		kernel_map.virt_offset = (kaslr_seed % nr_pos) * PAGE_SIZE;
 	}
 #endif
 
@@ -1154,7 +1185,7 @@ asmlinkage void __init setup_vm(uintptr_t dtb_pa)
 
 	/* Sanity check alignment and size */
 	BUG_ON((PAGE_OFFSET % PGDIR_SIZE) != 0);
-	BUG_ON((kernel_map.phys_addr % PMD_SIZE) != 0);
+	BUG_ON((kernel_map.phys_addr % PAGE_SIZE) != 0);
 
 #ifdef CONFIG_64BIT
 	/*
@@ -1204,16 +1235,44 @@ asmlinkage void __init setup_vm(uintptr_t dtb_pa)
 		create_pud_mapping(trampoline_pud, kernel_map.virt_addr,
 				   (uintptr_t)trampoline_pmd, PUD_SIZE, PAGE_TABLE);
 #ifdef CONFIG_XIP_KERNEL
+	/* XIP kernel: trampoline still uses PMD huge page (xiprom is PMD-aligned) */
 	create_pmd_mapping(trampoline_pmd, kernel_map.virt_addr,
 			   kernel_map.xiprom, PMD_SIZE, PAGE_KERNEL_EXEC);
 #else
+	/*
+	 * Trampoline uses PTE-level mapping to allow kernel to be loaded
+	 * at a non-PMD-aligned physical address. Map the first PMD_SIZE
+	 * region using individual PTE entries.
+	 */
 	create_pmd_mapping(trampoline_pmd, kernel_map.virt_addr,
-			   kernel_map.phys_addr, PMD_SIZE, PAGE_KERNEL_EXEC);
+			   (uintptr_t)trampoline_pte, PMD_SIZE, PAGE_TABLE);
+	{
+		uintptr_t va;
+		uintptr_t end_va = kernel_map.virt_addr + PMD_SIZE;
+
+		for (va = kernel_map.virt_addr; va < end_va; va += PAGE_SIZE)
+			create_pte_mapping(trampoline_pte, va,
+					   kernel_map.phys_addr + (va - kernel_map.virt_addr),
+					   PAGE_SIZE, PAGE_KERNEL_EXEC);
+	}
 #endif
 #else
-	/* Setup trampoline PGD */
+	/*
+	 * Trampoline uses PTE-level mapping (PMD folded case) to allow
+	 * kernel to be loaded at a non-PGDIR-aligned physical address.
+	 * Map the first PGDIR_SIZE region using individual PTE entries.
+	 */
 	create_pgd_mapping(trampoline_pg_dir, kernel_map.virt_addr,
-			   kernel_map.phys_addr, PGDIR_SIZE, PAGE_KERNEL_EXEC);
+			   (uintptr_t)trampoline_pte, PGDIR_SIZE, PAGE_TABLE);
+	{
+		uintptr_t va;
+		uintptr_t end_va = kernel_map.virt_addr + PGDIR_SIZE;
+
+		for (va = kernel_map.virt_addr; va < end_va; va += PAGE_SIZE)
+			create_pte_mapping(trampoline_pte, va,
+					   kernel_map.phys_addr + (va - kernel_map.virt_addr),
+					   PAGE_SIZE, PAGE_KERNEL_EXEC);
+	}
 #endif
 
 	/*

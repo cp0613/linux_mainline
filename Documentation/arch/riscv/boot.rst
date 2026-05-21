@@ -43,9 +43,13 @@ as per the devicetree specification and/or the UEFI specification.
 Kernel location
 ---------------
 
-The RISC-V kernel expects to be placed at a PMD boundary (2MB aligned for rv64
-and 4MB aligned for rv32). Note that the EFI stub will physically relocate the
-kernel if that's not the case.
+The RISC-V kernel must be placed at a page boundary (4KB aligned). Previously,
+the kernel required PMD boundary alignment (2MB for rv64, 4MB for rv32), but
+this restriction has been lifted by using PTE-level early page table mappings
+when the physical address is not PMD-aligned.
+
+Note that the EFI stub will physically relocate the kernel if that's not the
+case.
 
 Hardware description
 --------------------

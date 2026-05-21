@@ -88,11 +88,10 @@ static int elf_find_pbase(struct kimage *image, unsigned long kernel_len,
 	kbuf.buf_max = ULONG_MAX;
 
 	/*
-	 * Current riscv boot protocol requires 2MB alignment for
-	 * RV64 and 4MB alignment for RV32
-	 *
+	 * With PTE-level early kernel mapping, the kernel can be placed at
+	 * any PAGE_SIZE aligned address.
 	 */
-	kbuf.buf_align = PMD_SIZE;
+	kbuf.buf_align = PAGE_SIZE;
 	kbuf.mem = KEXEC_BUF_MEM_UNKNOWN;
 	kbuf.memsz = ALIGN(kernel_len, PAGE_SIZE);
 	kbuf.cma = NULL;

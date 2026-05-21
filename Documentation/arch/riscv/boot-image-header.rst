@@ -57,3 +57,8 @@ Notes
 
 - Image size is mandatory for boot loader to load kernel image. Booting will
   fail otherwise.
+
+- The text_offset field indicates the image load offset from the start of RAM.
+  The value is 0, meaning the kernel can be loaded at any page-aligned address.
+  Older kernels (before this change) had text_offset set to 0x200000 (2MB) for
+  rv64 and 0x400000 (4MB) for rv32.

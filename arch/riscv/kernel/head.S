@@ -44,11 +44,11 @@ SYM_CODE_START(_start)
 	.dword 0
 #else
 #if __riscv_xlen == 64
-	/* Image load offset(2MB) from start of RAM */
-	.dword 0x200000
+	/* Image load offset(0) from start of RAM */
+	.dword 0
 #else
-	/* Image load offset(4MB) from start of RAM */
-	.dword 0x400000
+	/* Image load offset(0) from start of RAM */
+	.dword 0
 #endif
 #endif
 	/* Effective size of kernel image */
@@ -116,9 +116,10 @@ relocate_enable_mmu:
 
 	/*
 	 * Switch to kernel page tables.  A full fence is necessary in order to
-	 * avoid using the trampoline translations, which are only correct for
-	 * the first superpage.  Fetching the fence is guaranteed to work
-	 * because that first superpage is translated the same way.
+	 * avoid using the trampoline translations, which are only set up for
+	 * the first PMD_SIZE (RV64) or PGDIR_SIZE (RV32) region.
+	 * Fetching the fence is guaranteed to work because that first region
+	 * is translated the same way.
 	 */
 	csrw CSR_SATP, a2
 	sfence.vma
