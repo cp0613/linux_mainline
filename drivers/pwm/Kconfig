@@ -783,6 +783,21 @@ config PWM_TH1520
 	  To compile this driver as a module, choose M here; the module
 	  will be called pwm-th1520. If you are unsure, say N.
 
+config PWM_TH1520_C
+	tristate "TH1520 PWM support (C implementation)"
+	depends on ARCH_THEAD || COMPILE_TEST
+	depends on !PWM_TH1520
+	depends on HAS_IOMEM && COMMON_CLK
+	help
+	  This option enables a C implementation of the driver for the
+	  PWM controller found on the T-HEAD TH1520 SoC, for kernel
+	  builds without Rust support (e.g. GCC-only toolchains). It is
+	  functionally equivalent to PWM_TH1520 and uses the same
+	  devicetree binding.
+
+	  To compile this driver as a module, choose M here; the module
+	  will be called pwm-th1520. If you are unsure, say N.
+
 config PWM_TIECAP
 	tristate "ECAP PWM support"
 	depends on ARCH_OMAP2PLUS || ARCH_DAVINCI_DA8XX || ARCH_KEYSTONE || ARCH_K3 || COMPILE_TEST
